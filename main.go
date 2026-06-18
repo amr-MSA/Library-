@@ -149,22 +149,37 @@ func askOpenRouter(apiKey, prompt string) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	var res map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&res)
-
-	// Parse JSON safely
-	if choices, ok := res["choices"].([]interface{}); ok && len(choices) > 0 {
-		if choice, ok := choices[0].(map[string]interface{}); ok {
-			if message, ok := choice["message"].(map[string]interface{}); ok {
-				if content, ok := message["content"].(string); ok {
-					return content, nil
-				}
-			}
-		}
+	// Strict struct parsing to eliminate interface conversion panics
+	var res struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+		Error struct {
+			Message string `json:"message"`
+		} `json:"error"`
 	}
 
-	return "Could not process response from model.", nil
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return "", err
+	}
+
+	// Case 1: OpenRouter returned an explicit API error
+	if res.Error.Message != "" {
+		return "OpenRouter Error: " + res.Error.Message, nil
+	}
+
+	// Case 2: Success response with valid choices
+	if len(res.Choices) > 0 {
+		return res.Choices[0].Message.Content, nil
+	}
+
+	return "Could not process response. Empty choices array from API.", nil
 }
+
+
+	
 
 func sendTelegramMessage(token string, chatID int64, text string) {
 	url := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", token)
