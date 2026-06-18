@@ -7,129 +7,79 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strings"
+	"strconv"
+
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-// Define structures for Telegram API
-type Update struct {
-	UpdateID int     `json:"update_id"`
-	Message  *Message `json:"message"`
-}
-
-type Message struct {
-	Chat struct {
-		ID int64 `json:"id"`
-	} `json:"chat"`
-	Text string `json:"text"`
-}
-
-type SendMessage struct {
-	ChatID int64  `json:"chat_id"`
-	Text   string `json:"text"`
-}
-
-// Global variable to store current model
-var currentModel = "openai/gpt-4o-mini:free"
+// Global variables for configuration
+var botToken = os.Getenv("TELEGRAM_BOT_TOKEN")
+var openRouterKey = os.Getenv("OPENROUTER_API_KEY")
+var currentModel = "openrouter/free" // Default configured to the Global Free Router
 
 func main() {
-	// 1. Trick Render: Start a fake web server on the required port to bypass port-scan timeout
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080" // Default port if not set
+	if botToken == "" || openRouterKey == "" {
+		log.Fatal("Critical Error: Environment variables are missing.")
 	}
-	
+
+	// Internal web server to satisfy Render's port binding requirement
 	go func() {
+		port := os.Getenv("PORT")
+		if port == "" {
+			port = "10000"
+		}
 		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			fmt.Fprintf(w, "Bot is running perfectly!")
+			fmt.Fprintf(w, "Bot is running perfectly.")
 		})
 		log.Printf("Fake web server listening on port %s", port)
-		if err := http.ListenAndServe(":" + port, nil); err != nil {
+		if err := http.ListenAndServe(":"+port, nil); err != nil {
 			log.Printf("Web server error: %v", err)
 		}
 	}()
 
-	// 2. Start the actual Telegram Bot logic
-	botToken := os.Getenv("TELEGRAM_BOT_TOKEN")
-	apiKey := os.Getenv("OPENROUTER_API_KEY")
-
-	if botToken == "" || apiKey == "" {
-		log.Fatal("Critical Error: TELEGRAM_BOT_TOKEN or OPENROUTER_API_KEY is missing!")
+	bot, err := tgbotapi.NewBotAPI(botToken)
+	if err != nil {
+		log.Fatalf("Telegram API connection error: %v", err)
 	}
 
 	log.Println("Bot starting and long polling initiated...")
-	offset := 0
+	u := tgbotapi.NewUpdate(0)
+	u.Timeout = 60
 
-	for {
-		updates, err := getUpdates(botToken, offset)
-		if err != nil {
-			log.Printf("Error getting updates: %v", err)
+	updates := bot.GetUpdatesChan(u)
+
+	for update := range updates {
+		if update.Message == nil {
 			continue
 		}
 
-		for _, update := range updates {
-			offset = update.UpdateID + 1
-			if update.Message != nil && update.Message.Text != "" {
-				handleMessage(botToken, apiKey, update.Message)
+		chatID := update.Message.Chat.ID
+		text := update.Message.Text
+
+		// Command parsing routing structure
+		switch text {
+		case "/start":
+			msg := "Welcome! Your AI Bot is now configured with the Global Free Router.\n\n" +
+				"Commands:\n" +
+				"🤖 /activate_ai - Core Free AI Router (Auto-selects best available free model)\n" +
+				"📝 Just send any text message to chat directly!"
+			sendTelegramMessage(chatID, msg)
+
+		case "/activate_ai":
+			currentModel = "openrouter/free"
+			sendTelegramMessage(chatID, "⚡ Global Free AI Router activated successfully! Ask me anything.")
+
+		default:
+			// Route standard incoming message to the active OpenRouter endpoint
+			reply, err := askOpenRouter(openRouterKey, text)
+			if err != nil {
+				sendTelegramMessage(chatID, "Error communicating with AI service.")
+				log.Printf("OpenRouter API execution failure: %v", err)
+				continue
 			}
+			sendTelegramMessage(chatID, reply)
 		}
 	}
-}
-
-func getUpdates(token string, offset int) ([]Update, error) {
-	url := fmt.Sprintf("https://api.telegram.org/bot%s/getUpdates?offset=%d&timeout=30", token, offset)
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	var res struct {
-		Ok     bool     `json:"ok"`
-		Result []Update `json:"result"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
-		return nil, err
-	}
-	return res.Result, nil
-}
-
-func handleMessage(botToken, apiKey string, msg *Message) {
-	text := msg.Text
-	chatID := msg.Chat.ID
-
-	// Handle commands to switch models
-	if strings.HasPrefix(text, "/") {
-		switch text {
-case "/start":
-    msg := "Welcome! Available Free Models:\n" +
-           "🤖 /model_gpt - GPT-4o Mini (Very Smart & Accurate)\n" +
-           "🤖 /model_mistral - Mistral 7B (Fast & Reliable)"
-    sendTelegramMessage(botToken, chatID, msg)
-
-
-case "/model_gpt":
-    currentModel = "openai/gpt-4o-mini:free"
-    sendTelegramMessage(botToken, chatID, "⚡ Switched to GPT-4o Mini Free. Ask me anything!")
-
-case "/model_mistral":
-    currentModel = "mistralai/mistral-7b-instruct:free"
-    sendTelegramMessage(botToken, chatID, "⚡ Switched to Mistral 7B Free. Ask me anything!")
-
-
-}
-
-		return
-	}
-
-	// Forward the prompt to OpenRouter
-	reply, err := askOpenRouter(apiKey, text)
-	if err != nil {
-		sendTelegramMessage(botToken, chatID, "Error communication with AI provider.")
-		log.Printf("OpenRouter error: %v", err)
-		return
-	}
-
-	sendTelegramMessage(botToken, chatID, reply)
 }
 
 func askOpenRouter(apiKey, prompt string) (string, error) {
@@ -153,7 +103,7 @@ func askOpenRouter(apiKey, prompt string) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	// Strict struct parsing to eliminate interface conversion panics
+	// Strict struct parsing to isolate structure failures from API responses
 	var res struct {
 		Choices []struct {
 			Message struct {
@@ -169,24 +119,29 @@ func askOpenRouter(apiKey, prompt string) (string, error) {
 		return "", err
 	}
 
-	// Case 1: OpenRouter returned an explicit API error
+	// Evaluate API errors safely
 	if res.Error.Message != "" {
 		return "OpenRouter Error: " + res.Error.Message, nil
 	}
 
-	// Case 2: Success response with valid choices
 	if len(res.Choices) > 0 {
 		return res.Choices[0].Message.Content, nil
 	}
 
-	return "Could not process response. Empty choices array from API.", nil
+	return "Could not process response. Empty response array returned.", nil
 }
 
+func sendTelegramMessage(chatID int64, text string) {
+	url := "https://api.telegram.org/bot" + botToken + "/sendMessage"
+	reqBody, _ := json.Marshal(map[string]interface{}{
+		"chat_id": chatID,
+		"text":    text,
+	})
 
-	
-
-func sendTelegramMessage(token string, chatID int64, text string) {
-	url := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", token)
-	reqBody, _ := json.Marshal(SendMessage{ChatID: chatID, Text: text})
-	http.Post(url, "application/json", bytes.NewBuffer(reqBody))
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(reqBody))
+	if err != nil {
+		log.Printf("Failed to transmit Telegram frame: %v", err)
+		return
+	}
+	resp.Body.Close()
 }
