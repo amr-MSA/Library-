@@ -100,20 +100,32 @@ func handleMessage(botToken, apiKey string, msg *Message) {
 	// Handle commands to switch models
 	if strings.HasPrefix(text, "/") {
 		switch text {
-		case "/start":
-			sendTelegramMessage(botToken, chatID, "Welcome! I am active.\nAvailable commands:\n/model_deepseek\n/model_gemini\n/model_qwen")
-		case "/model_deepseek":
-			currentModel = "deepseek/deepseek-chat"
-			sendTelegramMessage(botToken, chatID, "Switched to DeepSeek successfully.")
-		case "/model_gemini":
-			currentModel = "google/gemini-2.5-flash"
-			sendTelegramMessage(botToken, chatID, "Switched to Gemini Flash successfully.")
-		case "/model_qwen":
-			currentModel = "qwen/qwen-2.5-72b-instruct:free"
-			sendTelegramMessage(botToken, chatID, "Switched to Qwen Free successfully.")
-		default:
-			sendTelegramMessage(botToken, chatID, "Unknown command.")
-		}
+case "/start":
+    msg := "Welcome to your Multi-Model AI Bot!\n\n" +
+           "Available Free Models:\n" +
+           "🤖 /model_deepseek - DeepSeek R1 (Reasoning & Code)\n" +
+           "🤖 /model_qwen - Qwen 2.5 7B (Smart & Creative)\n" +
+           "🤖 /model_gemini - Gemini 2.5 Flash (Super Fast)\n" +
+           "🤖 /model_llama - Llama 3 8B (General Chat)"
+    sendTelegramMessage(botToken, chatID, msg)
+
+case "/model_deepseek":
+    currentModel = "deepseek/deepseek-r1:free"
+    sendTelegramMessage(botToken, chatID, "⚡ Switched to DeepSeek R1 Free. Ask me anything!")
+
+case "/model_qwen":
+    currentModel = "qwen/qwen-2.5-7b-instruct:free"
+    sendTelegramMessage(botToken, chatID, "⚡ Switched to Qwen 2.5 7B Free. Ask me anything!")
+
+case "/model_gemini":
+    currentModel = "google/gemini-2.5-flash:free"
+    sendTelegramMessage(botToken, chatID, "⚡ Switched to Gemini 2.5 Flash Free. Ask me anything!")
+
+case "/model_llama":
+    currentModel = "meta-llama/llama-3-8b-instruct:free"
+    sendTelegramMessage(botToken, chatID, "⚡ Switched to Llama 3 8B Free. Ask me anything!")
+}
+
 		return
 	}
 
