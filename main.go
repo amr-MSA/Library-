@@ -29,7 +29,7 @@ type SendMessage struct {
 }
 
 // Global variable to store current model
-var currentModel = "deepseek/deepseek-chat"
+var currentModel = "openai/gpt-4o-mini:free"
 
 func main() {
 	// 1. Trick Render: Start a fake web server on the required port to bypass port-scan timeout
@@ -101,29 +101,21 @@ func handleMessage(botToken, apiKey string, msg *Message) {
 	if strings.HasPrefix(text, "/") {
 		switch text {
 case "/start":
-    msg := "Welcome to your Multi-Model AI Bot!\n\n" +
-           "Available Free Models:\n" +
-           "🤖 /model_deepseek - DeepSeek R1 (Reasoning & Code)\n" +
-           "🤖 /model_qwen - Qwen 2.5 7B (Smart & Creative)\n" +
-           "🤖 /model_gemini - Gemini 2.5 Flash (Super Fast)\n" +
-           "🤖 /model_llama - Llama 3 8B (General Chat)"
+    msg := "Welcome! Available Free Models:\n" +
+           "🤖 /model_gpt - GPT-4o Mini (Very Smart & Accurate)\n" +
+           "🤖 /model_mistral - Mistral 7B (Fast & Reliable)"
     sendTelegramMessage(botToken, chatID, msg)
 
-case "/model_deepseek":
-    currentModel = "deepseek/deepseek-r1:free"
-    sendTelegramMessage(botToken, chatID, "⚡ Switched to DeepSeek R1 Free. Ask me anything!")
 
-case "/model_qwen":
-    currentModel = "qwen/qwen-2.5-7b-instruct:free"
-    sendTelegramMessage(botToken, chatID, "⚡ Switched to Qwen 2.5 7B Free. Ask me anything!")
+case "/model_gpt":
+    currentModel = "openai/gpt-4o-mini:free"
+    sendTelegramMessage(botToken, chatID, "⚡ Switched to GPT-4o Mini Free. Ask me anything!")
 
-case "/model_gemini":
-    currentModel = "google/gemini-2.5-flash:free"
-    sendTelegramMessage(botToken, chatID, "⚡ Switched to Gemini 2.5 Flash Free. Ask me anything!")
+case "/model_mistral":
+    currentModel = "mistralai/mistral-7b-instruct:free"
+    sendTelegramMessage(botToken, chatID, "⚡ Switched to Mistral 7B Free. Ask me anything!")
 
-case "/model_llama":
-    currentModel = "meta-llama/llama-3-8b-instruct:free"
-    sendTelegramMessage(botToken, chatID, "⚡ Switched to Llama 3 8B Free. Ask me anything!")
+
 }
 
 		return
