@@ -8,14 +8,13 @@ import (
 	"net/http"
 	"os"
 
-
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 // Global variables for configuration
 var botToken = os.Getenv("TELEGRAM_BOT_TOKEN")
 var openRouterKey = os.Getenv("OPENROUTER_API_KEY")
-var currentModel = "openrouter/free" // Default configured to the Global Free Router
+var currentModel = "google/gemini-2.5-flash" // Default ultra-fast free model
 
 func main() {
 	if botToken == "" || openRouterKey == "" {
@@ -59,15 +58,29 @@ func main() {
 		// Command parsing routing structure
 		switch text {
 		case "/start":
-			msg := "Welcome! Your AI Bot is now configured with the Global Free Router.\n\n" +
-				"Commands:\n" +
-				"🤖 /activate_ai - Core Free AI Router (Auto-selects best available free model)\n" +
-				"📝 Just send any text message to chat directly!"
+			msg := "Welcome! Available Strong Free Models:\n\n" +
+				"🤖 /model_gemini - Gemini 2.5 Flash (Fast & Smart)\n" +
+				"🤖 /model_gpt - GPT-4o Mini (Accurate & Creative)\n" +
+				"🤖 /model_deepseek - DeepSeek V3 Free (Powerful & Logical)\n" +
+				"🤖 /model_qwen - Qwen 2.5 72B Free (Excellent Arabic & Coding)\n\n" +
+				"📝 Just send any text message to chat with the active model!"
 			sendTelegramMessage(chatID, msg)
 
-		case "/activate_ai":
-			currentModel = "openrouter/free"
-			sendTelegramMessage(chatID, "⚡ Global Free AI Router activated successfully! Ask me anything.")
+		case "/model_gemini":
+			currentModel = "google/gemini-2.5-flash"
+			sendTelegramMessage(chatID, "⚡ Switched to Gemini 2.5 Flash Free. Ask me anything!")
+
+		case "/model_gpt":
+			currentModel = "openai/gpt-4o-mini:free"
+			sendTelegramMessage(chatID, "⚡ Switched to GPT-4o Mini Free. Ask me anything!")
+
+		case "/model_deepseek":
+			currentModel = "deepseek/deepseek-chat:free"
+			sendTelegramMessage(chatID, "⚡ Switched to DeepSeek V3 Free. Ask me anything!")
+
+		case "/model_qwen":
+			currentModel = "qwen/qwen-2.5-72b-instruct:free"
+			sendTelegramMessage(chatID, "⚡ Switched to Qwen 2.5 72B Free. Ask me anything!")
 
 		default:
 			// Route standard incoming message to the active OpenRouter endpoint
